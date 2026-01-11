@@ -6,7 +6,7 @@ iOS 홈 화면 위젯과 초 단위 카운트다운을 지원하는 React Native
 
 ## ✨ 주요 기능
 
-### � 핵심 기능
+### 🍀 핵심 기능
 - **실시간 카운트다운**: D-Day와 시:분:초 단위로 남은 시간 표시
 - **iOS 홈 위젯**: Small/Medium/Large 크기의 네이티브 위젯 지원
 - **커스텀 이벤트**: 아티스트, 이벤트 타입, 색상, 이모지 자유롭게 설정
@@ -191,10 +191,6 @@ export function isProEffective(isPro: boolean): boolean {
 3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
-
-## 📄 라이선스
-
-MIT License - 자유롭게 사용, 수정, 배포 가능합니다.
 
 ## 📮 문의
 
