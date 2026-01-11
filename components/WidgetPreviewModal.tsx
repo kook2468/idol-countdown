@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MotiView } from 'moti';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Modal,
   ScrollView,
@@ -10,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { CountdownEvent, WidgetSize } from '../constants/types';
+import { isWidgetSizeUsable } from '../shared/feature/featureGate';
 import { WidgetPreview } from './WidgetPreview';
 
 interface WidgetPreviewModalProps {
@@ -27,15 +29,61 @@ export function WidgetPreviewModal({
   isPro = false,
   onUpgrade,
 }: WidgetPreviewModalProps) {
-  const [size, setSize] = useState<WidgetSize>('medium');
+  const [size, setSize] = useState<WidgetSize>('small');
   const [showSeconds, setShowSeconds] = useState(false);
 
-  const handleSecondsToggle = () => {
+  // 이벤트가 과거인지 확인
+  const isPastEvent = new Date(event.date).getTime() < Date.now();
+
+  // 위젯별 초단위 설정 로드
+  useEffect(() => {
+    const loadShowSeconds = async () => {
+      try {
+        const key = `widget_showSeconds_${event.id}`;
+        const saved = await AsyncStorage.getItem(key);
+        if (saved !== null) {
+          setShowSeconds(JSON.parse(saved));
+        } else {
+          setShowSeconds(false);
+        }
+      } catch (error) {
+        console.error('Failed to load showSeconds:', error);
+      }
+    };
+
+    if (isOpen && !isPastEvent) {
+      loadShowSeconds();
+    } else if (isPastEvent) {
+      // 과거 이벤트는 자동으로 false
+      setShowSeconds(false);
+    }
+  }, [isOpen, event.id, isPastEvent]);
+
+  // 위젯 크기 변경 핸들러
+  const handleSizeChange = (newSize: WidgetSize) => {
+    // Free 모드에서 Medium/Large 선택 시 Pro 모달 표시
+    if (!isPro && !isWidgetSizeUsable(newSize, isPro)) {
+      onUpgrade?.();
+      return;
+    }
+    setSize(newSize);
+  };
+
+  const handleSecondsToggle = async () => {
     if (!isPro) {
       onUpgrade?.();
       return;
     }
-    setShowSeconds(!showSeconds);
+    const newValue = !showSeconds;
+    setShowSeconds(newValue);
+    
+    // AsyncStorage에 저장
+    try {
+      const key = `widget_showSeconds_${event.id}`;
+      await AsyncStorage.setItem(key, JSON.stringify(newValue));
+    } catch (error) {
+      console.error('Failed to save showSeconds:', error);
+    }
   };
 
   return (
@@ -62,7 +110,7 @@ export function WidgetPreviewModal({
               <View style={styles.sizeButtons}>
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => setSize('small')}
+                  onPress={() => handleSizeChange('small')}
                   style={[
                     styles.sizeButton,
                     size === 'small' && styles.sizeButtonActive,
@@ -80,10 +128,11 @@ export function WidgetPreviewModal({
 
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => setSize('medium')}
+                  onPress={() => handleSizeChange('medium')}
                   style={[
                     styles.sizeButton,
                     size === 'medium' && styles.sizeButtonActive,
+                    !isPro && styles.sizeButtonLocked,
                   ]}
                 >
                   <Text
@@ -94,14 +143,21 @@ export function WidgetPreviewModal({
                   >
                     Medium
                   </Text>
+                  <View style={styles.lockBadge}>
+                    {!isPro && (
+                      <Ionicons name="lock-closed" size={10} color="#FF6B9D" />
+                    )}
+                    <Text style={styles.lockText}>PRO</Text>
+                  </View>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => setSize('large')}
+                  onPress={() => handleSizeChange('large')}
                   style={[
                     styles.sizeButton,
                     size === 'large' && styles.sizeButtonActive,
+                    !isPro && styles.sizeButtonLocked,
                   ]}
                 >
                   <Text
@@ -112,43 +168,49 @@ export function WidgetPreviewModal({
                   >
                     Large
                   </Text>
+                  <View style={styles.lockBadge}>
+                    {!isPro && (
+                      <Ionicons name="lock-closed" size={10} color="#FF6B9D" />
+                    )}
+                    <Text style={styles.lockText}>PRO</Text>
+                  </View>
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* Settings */}
-            <View style={styles.section}>
-              <Text style={styles.label}>설정</Text>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={handleSecondsToggle}
-                style={styles.settingRow}
-              >
-                <View style={styles.settingLeft}>
-                  <Ionicons name="time" size={20} color="#6B7280" />
-                  <Text style={styles.settingText}>초 단위 표시</Text>
-                  {!isPro && (
-                    <View style={styles.proBadge}>
-                      <Ionicons name="lock-closed" size={10} color="#FF6B9D" />
-                      <Text style={styles.proText}>PRO</Text>
-                    </View>
-                  )}
-                </View>
-                <View
-                  style={[
-                    styles.toggle,
-                    showSeconds && styles.toggleActive,
-                  ]}
+            {/* Settings - Small 위젯 또는 과거 이벤트에서는 초단위 토글 숨김 */}
+            {size !== 'small' && !isPastEvent && (
+              <View style={styles.section}>
+                <Text style={styles.label}>설정</Text>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={handleSecondsToggle}
+                  style={styles.settingRow}
                 >
+                  <View style={styles.settingLeft}>
+                    <Ionicons name="time" size={20} color="#6B7280" />
+                    <Text style={styles.settingText}>초 단위 카운트다운</Text>
+                    {!isPro && (
+                      <Ionicons name="lock-closed" size={10} color="#FF6B9D" />
+                    )}
+                    <Text style={styles.lockText}>PRO</Text>
+                  </View>
                   <View
                     style={[
-                      styles.toggleCircle,
-                      showSeconds && styles.toggleCircleActive,
+                      styles.toggle,
+                      showSeconds && styles.toggleActive,
                     ]}
-                  />
-                </View>
-              </TouchableOpacity>
-            </View>
+                  >
+                    <View
+                      style={[
+                        styles.toggleCircle,
+                        showSeconds && styles.toggleCircleActive,
+                      ]}
+                    />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Preview */}
             <View style={styles.section}>
@@ -184,7 +246,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '85%',
+    maxHeight: '90%',
   },
   header: {
     paddingHorizontal: 24,
@@ -229,6 +291,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
     borderWidth: 2,
     borderColor: '#E5E7EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sizeButtonActive: {
     backgroundColor: '#FFF1F5',
@@ -242,6 +307,25 @@ const styles = StyleSheet.create({
   },
   sizeButtonTextActive: {
     color: '#FF6B9D',
+  },
+  sizeButtonLocked: {
+    opacity: 0.6,
+  },
+  lockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginLeft: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    backgroundColor: '#FFF1F5',
+    borderRadius: 6,
+  },
+  lockText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#FF6B9D',
+    letterSpacing: 0.5,
   },
   settingRow: {
     flexDirection: 'row',
@@ -299,7 +383,7 @@ const styles = StyleSheet.create({
   previewContainer: {
     alignItems: 'center',
     paddingVertical: 20,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#000',
     borderRadius: 16,
   },
   instructions: {

@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { MotiView } from 'moti';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { CountdownEvent } from '../constants/types';
+import { useCountdown } from '../hooks/use-countdown';
 
 interface CountdownCardProps {
   event: CountdownEvent;
@@ -10,6 +11,7 @@ interface CountdownCardProps {
 }
 
 const ICON_MAP: Record<string, any> = {
+  // Legacy icon names to Ionicons mapping
   Music: 'musical-notes',
   Mic: 'mic',
   Gift: 'gift',
@@ -34,25 +36,18 @@ const ICON_MAP: Record<string, any> = {
   '🎧': 'headset',
   '✨': 'sparkles',
   '📅': 'calendar',
+  '💜': 'heart',
+  '🐰': 'happy',
+  '💎': 'diamond',
 };
 
 export function CountdownCard({ event, onEdit, onDelete }: CountdownCardProps) {
-  const calculateDaysLeft = () => {
-    const now = new Date();
-    const eventDate = new Date(event.date);
-    const diffTime = eventDate.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  const daysLeft = calculateDaysLeft();
-  const isDDay = daysLeft === 0;
-  const isPast = daysLeft < 0;
+  // 카운트다운 계산 (실시간 업데이트 불필요)
+  const timeLeft = useCountdown(event.date, false);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('ko-KR', {
-      year: 'numeric',
       month: 'long',
       day: 'numeric',
       hour: '2-digit',
@@ -60,225 +55,169 @@ export function CountdownCard({ event, onEdit, onDelete }: CountdownCardProps) {
     });
   };
 
-  const iconName = ICON_MAP[event.emoji || 'Music'] || 'musical-notes';
+  // event.emoji가 Ionicons 이름이면 그대로 사용, 아니면 ICON_MAP에서 변환
+  const iconName = ICON_MAP[event.emoji || 'musical-notes'] || event.emoji || 'musical-notes';
+  const accentColor = event.color || '#FF6B9D';
+  
+  // 아티스트명과 이벤트명 분리
+  const artistMatch = event.title.match(/^\[(.*?)\]/);
+  const artistName = artistMatch ? artistMatch[1] : '';
+  const eventTitle = event.title.replace(/^\[.*?\]\s*/, '');
+
+  // 우측 스와이프 액션 (삭제)
+  const renderRightActions = () => (
+    <View style={styles.swipeActions}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => onEdit(event)}
+        style={[styles.swipeAction, styles.editAction]}
+      >
+        <Ionicons name="create-outline" size={20} color="#fff" />
+        <Text style={styles.swipeActionText}>편집</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => onDelete(event.id)}
+        style={[styles.swipeAction, styles.deleteAction]}
+      >
+        <Ionicons name="trash-outline" size={20} color="#fff" />
+        <Text style={styles.swipeActionText}>삭제</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
-    <MotiView
-      from={{ opacity: 0, scale: 0.9, translateY: 20 }}
-      animate={{ opacity: 1, scale: 1, translateY: 0 }}
-      exit={{ opacity: 0, scale: 0.9, translateX: -100 }}
-      transition={{ type: 'timing', duration: 300 }}
-      style={[
-        styles.card,
-        {
-          backgroundColor: `${event.color}15`,
-          borderColor: `${event.color}40`,
-        },
-      ]}
-    >
-      {/* Sparkle decoration */}
-      <View style={styles.sparkleContainer}>
-        <MotiView
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.5, 1, 0.5],
-          }}
-          transition={{
-            type: 'timing',
-            duration: 2000,
-            loop: true,
-          }}
-        >
-          <Ionicons
-            name="sparkles"
-            size={12}
-            color={event.color}
-            style={{ opacity: 0.4 }}
-          />
-        </MotiView>
-      </View>
+    <Swipeable renderRightActions={renderRightActions} overshootRight={false}>
+      <View style={styles.listItem}>
+        {/* 좌측: 아이콘 + 텍스트 정보 */}
+        <View style={styles.leftContent}>
+          {/* 아이콘 */}
+          <View style={[styles.iconContainer, { backgroundColor: `${accentColor}15` }]}>
+            <Ionicons name={iconName as any} size={24} color={accentColor} />
+          </View>
 
-      {/* Top: Icon + Title */}
-      <View style={styles.header}>
-        <MotiView
-          style={[styles.iconContainer, { backgroundColor: `${event.color}30` }]}
-          animate={{
-            shadowOpacity: [0, 0.3, 0],
-          }}
-          transition={{
-            type: 'timing',
-            duration: 2000,
-            loop: true,
-          }}
-        >
-          <Ionicons name={iconName as any} size={24} color={event.color} />
-        </MotiView>
-
-        <View style={styles.titleContainer}>
-          <Text style={styles.title} numberOfLines={1}>
-            {event.title}
-          </Text>
-          {event.subtitle && (
-            <Text style={styles.subtitle} numberOfLines={1}>
-              {event.subtitle}
+          {/* 텍스트 정보 */}
+          <View style={styles.textContent}>
+            {/* 아티스트명 */}
+            {artistName && (
+              <Text style={[styles.artistName, { color: accentColor }]} numberOfLines={1}>
+                {artistName}
+              </Text>
+            )}
+            
+            {/* 이벤트명 */}
+            <Text style={styles.eventName} numberOfLines={1}>
+              {eventTitle}
             </Text>
-          )}
+          </View>
+        </View>
+
+        {/* 우측: D-Day + 날짜/시간 */}
+        <View style={styles.rightContent}>
+          {/* D-Day */}
+          <View style={styles.ddayContainer}>
+            <Text style={styles.ddayText}>
+              D{timeLeft.days >= 0 ? '-' : '+'}
+              <Text style={styles.ddayNumber}>{Math.abs(timeLeft.days)}</Text>
+            </Text>
+          </View>
+
+          {/* 날짜/시간 */}
+          <Text style={styles.dateText}>{formatDate(event.date)}</Text>
         </View>
       </View>
-
-      {/* D-Day Display */}
-      <View
-        style={[
-          styles.ddayContainer,
-          { backgroundColor: `${event.color}25` },
-        ]}
-      >
-        {isDDay ? (
-          <View style={styles.ddayContent}>
-            <MotiView
-              animate={{
-                scale: [1, 1.1, 1],
-                rotate: ['0deg', '5deg', '-5deg', '0deg'],
-              }}
-              transition={{
-                type: 'timing',
-                duration: 1000,
-                loop: true,
-              }}
-            >
-              <Ionicons name="happy" size={24} color={event.color} />
-            </MotiView>
-            <Text style={[styles.ddayText, { color: event.color }]}>D-DAY</Text>
-          </View>
-        ) : isPast ? (
-          <View style={styles.ddayContent}>
-            <Text style={styles.pastText}>종료</Text>
-          </View>
-        ) : (
-          <View style={styles.ddayContent}>
-            <Text style={[styles.ddayNumber, { color: event.color }]}>
-              D-{daysLeft}
-            </Text>
-            {/* <Text style={styles.ddayLabel}>
-              {daysLeft === 1 ? '내일' : `${daysLeft}일`}
-            </Text> */}
-          </View>
-        )}
-      </View>
-
-      {/* Date */}
-      <View style={styles.dateContainer}>
-        <Text style={styles.dateText}>{formatDate(event.date)}</Text>
-      </View>
-
-      {/* Action buttons */}
-      <View style={styles.actions}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => onEdit(event)}
-          style={styles.actionButton}
-        >
-          <Ionicons name="create-outline" size={14} color={event.color} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => onDelete(event.id)}
-          style={styles.actionButton}
-        >
-          <Ionicons name="trash-outline" size={14} color="#EF4444" />
-        </TouchableOpacity>
-      </View>
-    </MotiView>
+    </Swipeable>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: 24,
-    padding: 16,
-    borderWidth: 2,
-    marginBottom: 12,
-    position: 'relative',
-  },
-  sparkleContainer: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-  },
-  header: {
+  // iOS 리스트 아이템 스타일
+  listItem: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E7EB',
+  },
+  
+  // 좌측 콘텐츠
+  leftContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
     gap: 12,
-    marginBottom: 12,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  titleContainer: {
+  textContent: {
     flex: 1,
+    gap: 2,
   },
-  title: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 2,
+  artistName: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
-  subtitle: {
-    fontSize: 12,
+  eventName: {
+    fontSize: 14,
     color: '#6B7280',
+    fontWeight: '400',
+  },
+  
+  // 우측 콘텐츠
+  rightContent: {
+    alignItems: 'flex-end',
+    gap: 4,
+    marginLeft: 12,
   },
   ddayContainer: {
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    marginBottom: 8,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  ddayContent: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    alignItems: 'baseline',
   },
   ddayText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
-  pastText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#9CA3AF',
-  },
-  ddayNumber: {
-    fontSize: 30,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1F2937',
     letterSpacing: -1,
   },
-  ddayLabel: {
-    fontSize: 13,
-    color: '#6B7280',
-    paddingBottom: 4,
-  },
-  dateContainer: {
-    marginBottom: 8,
+  ddayNumber: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1F2937',
   },
   dateText: {
     fontSize: 11,
-    color: '#6B7280',
+    color: '#777',
+    fontWeight: '400',
   },
-  actions: {
+  
+  // 스와이프 액션
+  swipeActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+  },
+  swipeAction: {
+    width: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
     gap: 4,
   },
-  actionButton: {
-    padding: 6,
-    borderRadius: 8,
+  editAction: {
+    backgroundColor: '#3B82F6',
+  },
+  deleteAction: {
+    backgroundColor: '#EF4444',
+  },
+  swipeActionText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

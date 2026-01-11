@@ -1,26 +1,31 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MotiView } from 'moti';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Modal,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { ARTIST_PRESETS, CountdownEvent, EVENT_TYPE_PRESETS } from '../constants/types';
+import { ArtistPresetSelector, CustomArtist } from './ArtistPresetSelector';
+import { CustomEventType, EventTypePresetSelector } from './EventTypePresetSelector';
 
 interface AddEventModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (event: Omit<CountdownEvent, 'id'> | CountdownEvent) => void;
   editingEvent?: CountdownEvent | null;
-  isPro?: boolean;
-  onUpgrade?: () => void;
+  isPro?: boolean; // Deprecated: Custom은 이제 Free에서도 가능
+  onUpgrade?: () => void; // Deprecated: Custom은 이제 Free에서도 가능
+  customArtists?: CustomArtist[];
+  customEventTypes?: CustomEventType[];
+  onUpdateCustomArtists?: (artists: CustomArtist[]) => void;
+  onUpdateCustomEventTypes?: (types: CustomEventType[]) => void;
 }
 
 export function AddEventModal({
@@ -30,28 +35,26 @@ export function AddEventModal({
   editingEvent,
   isPro = false,
   onUpgrade,
+  customArtists = [],
+  customEventTypes = [],
+  onUpdateCustomArtists = () => {},
+  onUpdateCustomEventTypes = () => {},
 }: AddEventModalProps) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [eventType, setEventType] = useState('comeback');
   const [artistPreset, setArtistPreset] = useState('bts');
-  const [customArtistName, setCustomArtistName] = useState('');
-  const [customEventName, setCustomEventName] = useState('');
 
   useEffect(() => {
     if (editingEvent) {
       setSelectedDate(new Date(editingEvent.date));
       setEventType(editingEvent.eventType || 'comeback');
       setArtistPreset(editingEvent.artistPreset || 'bts');
-      setCustomArtistName(editingEvent.customArtistName || '');
-      setCustomEventName(editingEvent.customEventName || '');
     } else {
       setSelectedDate(new Date());
       setEventType('comeback');
       setArtistPreset('bts');
-      setCustomArtistName('');
-      setCustomEventName('');
     }
   }, [editingEvent, isOpen]);
 
@@ -65,27 +68,21 @@ export function AddEventModal({
   };
 
   const handleSubmit = () => {
-    if ((artistPreset === 'custom' || eventType === 'custom') && !isPro) {
-      onUpgrade?.();
-      return;
-    }
+    // Find artist info from presets or custom artists
+    const allArtists = [...ARTIST_PRESETS, ...customArtists];
+    const selectedArtist = allArtists.find((a) => a.id === artistPreset);
+    const artistName = selectedArtist?.name || '';
+    const artistColor = selectedArtist?.color || '#FF6B9D';
 
-    const artistName =
-      artistPreset === 'custom'
-        ? customArtistName
-        : ARTIST_PRESETS.find((a) => a.id === artistPreset)?.name || '';
-
-    const eventName =
-      eventType === 'custom'
-        ? customEventName
-        : EVENT_TYPE_PRESETS.find((e) => e.id === eventType)?.label || '';
+    // Find event type info from presets or custom event types
+    const allEventTypes = [...EVENT_TYPE_PRESETS, ...customEventTypes];
+    const selectedEventType = allEventTypes.find((e) => e.id === eventType);
+    const eventName = selectedEventType?.label || '';
+    const eventIcon = selectedEventType?.icon || 'musical-notes';
 
     const title = `[${artistName}] ${eventName}`;
-
-    const eventPreset = EVENT_TYPE_PRESETS.find((e) => e.id === eventType);
-    const artistColor = ARTIST_PRESETS.find((a) => a.id === artistPreset)?.color;
-    const color = artistColor || eventPreset?.color || '#FF6B9D';
-    const emoji = eventPreset?.icon || 'Music';
+    const color = artistColor;
+    const emoji = eventIcon;
     const date = formatDateToISO(selectedDate);
 
     if (editingEvent) {
@@ -97,8 +94,6 @@ export function AddEventModal({
         emoji,
         eventType,
         artistPreset,
-        customArtistName,
-        customEventName,
       });
     } else {
       onSave({
@@ -108,8 +103,6 @@ export function AddEventModal({
         emoji,
         eventType,
         artistPreset,
-        customArtistName,
-        customEventName,
       });
     }
 
@@ -117,37 +110,36 @@ export function AddEventModal({
   };
 
   const handleDateChange = (event: any, date?: Date) => {
-    setShowDatePicker(Platform.OS === 'ios');
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
     if (date) {
       setSelectedDate(date);
     }
   };
 
   const handleTimeChange = (event: any, date?: Date) => {
-    setShowTimePicker(Platform.OS === 'ios');
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
     if (date) {
       setSelectedDate(date);
     }
   };
 
-  const handleArtistPresetSelect = (artistId: string) => {
-    if (artistId === 'custom' && !isPro) {
-      onUpgrade?.();
-      return;
+  const showDatePickerOnly = useCallback(() => {
+    if (!showDatePicker) {
+      setShowTimePicker(false);
+      setShowDatePicker(true);
     }
-    setArtistPreset(artistId);
-  };
+  }, [showDatePicker]);
 
-  const handleEventTypeSelect = (typeId: string) => {
-    if (typeId === 'custom' && !isPro) {
-      onUpgrade?.();
-      return;
+  const showTimePickerOnly = useCallback(() => {
+    if (!showTimePicker) {
+      setShowDatePicker(false);
+      setShowTimePicker(true);
     }
-    setEventType(typeId);
-  };
-
-  const isCustomArtist = artistPreset === 'custom';
-  const isCustomEvent = eventType === 'custom';
+  }, [showTimePicker]);
 
   return (
     <Modal visible={isOpen} transparent animationType="slide" onRequestClose={onClose}>
@@ -168,108 +160,35 @@ export function AddEventModal({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.content}>
+          <ScrollView 
+            style={styles.content}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled={false}
+            removeClippedSubviews={false}
+          >
             <View style={styles.section}>
               <Text style={styles.label}>아티스트</Text>
-              <View style={styles.grid3}>
-                {ARTIST_PRESETS.map((artist) => {
-                  const isLocked = artist.isPro && !isPro;
-                  const isSelected = artistPreset === artist.id;
-                  return (
-                    <TouchableOpacity
-                      key={artist.id}
-                      activeOpacity={0.8}
-                      onPress={() => handleArtistPresetSelect(artist.id)}
-                      style={[
-                        styles.presetButton,
-                        isSelected && {
-                          backgroundColor: `${artist.color}30`,
-                          borderColor: artist.color,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.presetText,
-                          isSelected && { color: artist.color },
-                        ]}
-                      >
-                        {artist.name}
-                      </Text>
-                      {isLocked && (
-                        <View style={styles.lockBadge}>
-                          <Ionicons name="lock-closed" size={10} color="#FF6B9D" />
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              <ArtistPresetSelector
+                selectedPresetId={artistPreset}
+                customArtists={customArtists}
+                onSelect={(presetId) => {
+                  setArtistPreset(presetId);
+                }}
+                onUpdateCustomArtist={onUpdateCustomArtists}
+              />
             </View>
-
-            {isCustomArtist && isPro && (
-              <View style={styles.section}>
-                <Text style={styles.label}>아티스트 이름</Text>
-                <TextInput
-                  value={customArtistName}
-                  onChangeText={setCustomArtistName}
-                  placeholder="예: 아이유"
-                  style={styles.input}
-                  placeholderTextColor="#9CA3AF"
-                />
-              </View>
-            )}
 
             <View style={styles.section}>
               <Text style={styles.label}>이벤트 타입</Text>
-              <View style={styles.grid2}>
-                {EVENT_TYPE_PRESETS.map((type) => {
-                  const isLocked = type.isPro && !isPro;
-                  const isSelected = eventType === type.id;
-                  return (
-                    <TouchableOpacity
-                      key={type.id}
-                      activeOpacity={0.8}
-                      onPress={() => handleEventTypeSelect(type.id)}
-                      style={[
-                        styles.presetButton,
-                        isSelected && {
-                          backgroundColor: `${type.color}20`,
-                          borderColor: type.color,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.presetText,
-                          isSelected && { color: type.color },
-                        ]}
-                      >
-                        {type.label}
-                      </Text>
-                      {isLocked && (
-                        <View style={styles.lockBadge}>
-                          <Ionicons name="lock-closed" size={10} color="#FF6B9D" />
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              <EventTypePresetSelector
+                selectedTypeId={eventType}
+                customEventTypes={customEventTypes}
+                onSelect={(typeId) => {
+                  setEventType(typeId);
+                }}
+                onUpdateCustomEventTypes={onUpdateCustomEventTypes}
+              />
             </View>
-
-            {isCustomEvent && isPro && (
-              <View style={styles.section}>
-                <Text style={styles.label}>이벤트 이름</Text>
-                <TextInput
-                  value={customEventName}
-                  onChangeText={setCustomEventName}
-                  placeholder="예: 단독 콘서트"
-                  style={styles.input}
-                  placeholderTextColor="#9CA3AF"
-                />
-              </View>
-            )}
 
             <View style={styles.section}>
               <Text style={styles.label}>날짜 및 시간</Text>
@@ -277,7 +196,7 @@ export function AddEventModal({
               <View style={styles.dateTimeContainer}>
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => setShowDatePicker(true)}
+                  onPress={showDatePickerOnly}
                   style={styles.dateTimeButton}
                 >
                   <Ionicons name="calendar" size={20} color="#6B7280" />
@@ -292,7 +211,7 @@ export function AddEventModal({
 
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => setShowTimePicker(true)}
+                  onPress={showTimePickerOnly}
                   style={styles.dateTimeButton}
                 >
                   <Ionicons name="time" size={20} color="#6B7280" />
@@ -305,25 +224,28 @@ export function AddEventModal({
                 </TouchableOpacity>
               </View>
 
-              {showDatePicker && (
+              <View style={showDatePicker ? styles.pickerContainer : styles.pickerHidden}>
                 <DateTimePicker
                   value={selectedDate}
                   mode="date"
                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                   onChange={handleDateChange}
                 />
-              )}
+              </View>
 
-              {showTimePicker && (
+              <View style={showTimePicker ? styles.pickerContainer : styles.pickerHidden}>
                 <DateTimePicker
                   value={selectedDate}
                   mode="time"
                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                   onChange={handleTimeChange}
                 />
-              )}
+              </View>
             </View>
+          </ScrollView>
 
+          {/* 하단 고정 버튼 */}
+          <View style={styles.footer}>
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={handleSubmit}
@@ -333,7 +255,7 @@ export function AddEventModal({
                 {editingEvent ? '수정' : '추가'}
               </Text>
             </TouchableOpacity>
-          </ScrollView>
+          </View>
         </MotiView>
       </View>
     </Modal>
@@ -353,7 +275,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '85%',
+    maxHeight: '90%',
   },
   header: {
     paddingHorizontal: 24,
@@ -448,11 +370,25 @@ const styles = StyleSheet.create({
     color: '#111827',
     fontWeight: '500',
   },
+  pickerContainer: {
+    marginTop: 12,
+  },
+  pickerHidden: {
+    height: 0,
+    overflow: 'hidden',
+  },
+  footer: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    backgroundColor: '#fff',
+  },
   submitButton: {
     backgroundColor: '#FF6B9D',
     paddingVertical: 14,
     borderRadius: 12,
-    marginBottom: 24,
   },
   submitText: {
     fontSize: 15,

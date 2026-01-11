@@ -1,64 +1,71 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
+import { useState } from 'react';
 import {
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { FEATURE_LIMIT_INFO, PRO_UPGRADE_COPY } from '../constants/proCopy';
+import { CountdownEvent } from '../constants/types';
 
 interface ProModalProps {
   isOpen: boolean;
   onClose: () => void;
-  feature?: 'lockscreen' | 'seconds' | 'themes' | 'icons';
+  limitReason?: 'widget' | 'seconds' | null;
 }
 
-const FEATURE_INFO = {
-  lockscreen: {
-    title: '잠금화면 위젯',
-    description: '잠금화면에서도 D-Day를 바로 확인하세요',
-    icon: 'lock-closed' as const,
-  },
-  seconds: {
-    title: '초 단위 카운트',
-    description: '더 정확한 카운트다운을 경험하세요',
-    icon: 'sparkles' as const,
-  },
-  themes: {
-    title: '프리미엄 테마',
-    description: '다양한 테마로 위젯을 꾸며보세요',
-    icon: 'trophy' as const,
-  },
-  icons: {
-    title: '모든 아이콘',
-    description: '원하는 아이콘으로 커스터마이징하세요',
-    icon: 'sparkles' as const,
-  },
-};
+export function ProModal({ isOpen, onClose, limitReason }: ProModalProps) {
+  const limitInfo = limitReason ? FEATURE_LIMIT_INFO[limitReason] : null;
+  const [expandedFeature, setExpandedFeature] = useState<number | null>(null);
 
-export function ProModal({ isOpen, onClose, feature }: ProModalProps) {
-  const featureInfo = feature ? FEATURE_INFO[feature] : null;
+  // 샘플 이벤트 데이터
+  const sampleEvent: CountdownEvent = {
+    id: 'pro-modal-sample',
+    title: '[Sample] 컴백',
+    date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    emoji: 'sparkles',
+    color: '#A855F7',
+  };
 
   const handleUpgrade = () => {
-    Alert.alert('알림', 'PRO 버전 구매 기능은 데모입니다.');
+    Alert.alert(
+      PRO_UPGRADE_COPY.alerts.purchaseDemo.title,
+      PRO_UPGRADE_COPY.alerts.purchaseDemo.message
+    );
     onClose();
+  };
+  
+  const handleRestore = () => {
+    Alert.alert(
+      PRO_UPGRADE_COPY.alerts.restoreFailed.title,
+      PRO_UPGRADE_COPY.alerts.restoreFailed.message
+    );
   };
 
   return (
-    <Modal visible={isOpen} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <TouchableOpacity style={styles.backdropTouch} onPress={onClose} />
+    <Modal 
+      visible={isOpen} 
+      transparent 
+      animationType="fade" 
+      onRequestClose={onClose}
+      statusBarTranslucent
+      presentationStyle="overFullScreen"
+    >
+      <View style={styles.backdrop} pointerEvents="box-none">
+        <TouchableOpacity style={styles.backdropTouch} onPress={onClose} activeOpacity={1} />
 
         <MotiView
           from={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           style={styles.modal}
         >
-          {/* Gradient Header */}
+          {/* Gradient Header - 축소 */}
           <LinearGradient
             colors={['#F472B6', '#A855F7']}
             start={{ x: 0, y: 0 }}
@@ -66,7 +73,7 @@ export function ProModal({ isOpen, onClose, feature }: ProModalProps) {
             style={styles.header}
           >
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={20} color="#fff" />
+              <Ionicons name="close" size={18} color="#fff" />
             </TouchableOpacity>
 
             <MotiView
@@ -78,71 +85,57 @@ export function ProModal({ isOpen, onClose, feature }: ProModalProps) {
                 loop: true,
               }}
             >
-              <Ionicons name="trophy" size={64} color="#fff" style={styles.crownIcon} />
+              <Ionicons name="trophy" size={40} color="#fff" style={styles.crownIcon} />
             </MotiView>
-            <Text style={styles.headerTitle}>PRO로 업그레이드</Text>
-            <Text style={styles.headerSubtitle}>완벽한 카운트다운 경험을 만나보세요</Text>
+            <Text style={styles.headerTitle}>{PRO_UPGRADE_COPY.title}</Text>
+            <Text style={styles.headerSubtitle}>{PRO_UPGRADE_COPY.subtitle}</Text>
           </LinearGradient>
 
           {/* Content */}
           <ScrollView style={styles.content}>
-            {/* Current Feature Highlight */}
-            {featureInfo && (
+            {/* Limit Reason Highlight */}
+            {limitInfo && (
               <View style={styles.featureHighlight}>
                 <View style={styles.featureIconContainer}>
-                  <Ionicons name={featureInfo.icon} size={20} color="#fff" />
+                  <Ionicons name={limitInfo.icon} size={20} color="#fff" />
                 </View>
                 <View style={styles.featureTextContainer}>
-                  <Text style={styles.featureTitle}>{featureInfo.title}</Text>
-                  <Text style={styles.featureDescription}>{featureInfo.description}</Text>
+                  <Text style={styles.featureTitle}>{limitInfo.title}</Text>
+                  <Text style={styles.featureDescription}>{limitInfo.description}</Text>
                 </View>
               </View>
             )}
 
-            {/* Features List */}
+            {/* Features List - 컴팩트 버전 */}
             <View style={styles.featuresList}>
-              <View style={styles.featureItem}>
-                <View style={styles.checkCircle}>
-                  <Ionicons name="checkmark" size={16} color="#FF6B9D" />
-                </View>
-                <View style={styles.featureItemText}>
-                  <Text style={styles.featureItemTitle}>홈/잠금화면에서 D-Day 바로 확인</Text>
-                  <Text style={styles.featureItemSubtitle}>위젯으로 한눈에 확인</Text>
-                </View>
-              </View>
-
-              <View style={styles.featureItem}>
-                <View style={styles.checkCircle}>
-                  <Ionicons name="checkmark" size={16} color="#FF6B9D" />
-                </View>
-                <View style={styles.featureItemText}>
-                  <Text style={styles.featureItemTitle}>컴백 순간까지 초 단위로 카운트</Text>
-                  <Text style={styles.featureItemSubtitle}>더 정확한 카운트다운</Text>
-                </View>
-              </View>
-
-              <View style={styles.featureItem}>
-                <View style={styles.checkCircle}>
-                  <Ionicons name="checkmark" size={16} color="#FF6B9D" />
-                </View>
-                <View style={styles.featureItemText}>
-                  <Text style={styles.featureItemTitle}>커스텀 이벤트 무제한 추가</Text>
-                  <Text style={styles.featureItemSubtitle}>원하는 이벤트 자유롭게</Text>
-                </View>
-              </View>
+              {PRO_UPGRADE_COPY.benefits.map((benefit, index) => {
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    activeOpacity={0.7}
+                    style={styles.featureItem}
+                  >
+                    <View style={styles.checkCircle}>
+                      <Ionicons name={benefit.icon} size={16} color="#FF6B9D" />
+                    </View>
+                    <View style={styles.featureItemText}>
+                      <View style={styles.featureItemHeader}>
+                        <Text style={styles.featureItemTitle}>{benefit.title}</Text>
+                      </View>
+                      <Text style={styles.featureItemSubtitle}>{benefit.description}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
-            {/* Pricing */}
-            <View style={styles.pricingBox}>
-              <Text style={styles.pricingLabel}>단 한 번의 결제로</Text>
-              <Text style={styles.pricingAmount}>₩4,900</Text>
-              <View style={styles.lifetimeBadge}>
-                <Text style={styles.lifetimeText}>평생 사용</Text>
+            {/* 가격 & CTA 통합 블록 */}
+            <View style={styles.pricingCTABlock}>
+              <View style={styles.pricingBox}>
+                <Text style={styles.pricingLabel}>{PRO_UPGRADE_COPY.priceLabel}</Text>
+                <Text style={styles.pricingAmount}>{PRO_UPGRADE_COPY.priceAmount}</Text>
               </View>
-            </View>
 
-            {/* CTA Buttons */}
-            <View style={styles.buttons}>
               <TouchableOpacity
                 activeOpacity={0.9}
                 onPress={handleUpgrade}
@@ -153,16 +146,29 @@ export function ProModal({ isOpen, onClose, feature }: ProModalProps) {
                   end={{ x: 1, y: 0 }}
                   style={styles.upgradeButton}
                 >
-                  <Text style={styles.upgradeButtonText}>PRO로 업그레이드</Text>
+                  <Text style={styles.upgradeButtonText}>{PRO_UPGRADE_COPY.buttons.upgrade}</Text>
                 </LinearGradient>
               </TouchableOpacity>
+            </View>
 
+            {/* 하단 보조 링크 */}
+            <View style={styles.footerLinks}>
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={onClose}
                 style={styles.laterButton}
               >
-                <Text style={styles.laterButtonText}>나중에</Text>
+                <Text style={styles.laterButtonText}>{PRO_UPGRADE_COPY.buttons.later}</Text>
+              </TouchableOpacity>
+              
+              <Text style={styles.linkSeparator}>•</Text>
+              
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={handleRestore}
+                style={styles.restoreButton}
+              >
+                <Text style={styles.restoreButtonText}>{PRO_UPGRADE_COPY.buttons.restore}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -179,9 +185,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
+    zIndex: 999999,
+    elevation: 999999,
   },
   backdropTouch: {
     ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
   },
   modal: {
     backgroundColor: '#fff',
@@ -189,34 +198,39 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     overflow: 'hidden',
+    zIndex: 1000000,
+    elevation: 1000000,
   },
   header: {
-    padding: 32,
+    padding: 20,
+    paddingTop: 24,
     alignItems: 'center',
   },
   closeButton: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    top: 12,
+    right: 12,
     padding: 8,
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 20,
+    zIndex: 10,
   },
   crownIcon: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.85)',
   },
   content: {
-    padding: 24,
+    padding: 20,
+    paddingTop: 16,
   },
   featureHighlight: {
     flexDirection: 'row',
@@ -250,12 +264,13 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   featuresList: {
-    gap: 12,
-    marginBottom: 24,
+    gap: 8,
+    marginBottom: 20,
   },
   featureItem: {
     flexDirection: 'row',
     gap: 12,
+    paddingVertical: 4,
   },
   checkCircle: {
     width: 24,
@@ -269,51 +284,46 @@ const styles = StyleSheet.create({
   featureItemText: {
     flex: 1,
   },
+  featureItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   featureItemTitle: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#111827',
-    marginBottom: 2,
   },
   featureItemSubtitle: {
     fontSize: 12,
     color: '#6B7280',
+    marginTop: 4,
+    lineHeight: 17,
+  },
+  // 가격 & CTA 통합 블록
+  pricingCTABlock: {
+    gap: 16,
+    marginBottom: 12,
   },
   pricingBox: {
     backgroundColor: '#F9FAFB',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     alignItems: 'center',
-    marginBottom: 24,
   },
   pricingLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#6B7280',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   pricingAmount: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#111827',
-    marginBottom: 8,
-  },
-  lifetimeBadge: {
-    backgroundColor: '#FFF1F5',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  lifetimeText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FF6B9D',
-  },
-  buttons: {
-    gap: 12,
-    marginBottom: 16,
   },
   upgradeButton: {
-    paddingVertical: 16,
+    paddingVertical: 15,
     borderRadius: 12,
     alignItems: 'center',
   },
@@ -322,14 +332,54 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
-  laterButton: {
+  // 위젯 썸네일 - 보조 증거
+  widgetThumbnailSection: {
+    marginTop: 16,
+    marginBottom: 12,
+    alignItems: 'center',
     paddingVertical: 12,
     borderRadius: 12,
+  },
+  widgetThumbnailLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
+    marginBottom: 8,
+    letterSpacing: 0.3,
+  },
+  widgetThumbnailContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.8,
+  },
+  // 하단 보조 링크
+  footerLinks: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+  },
+  laterButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
   },
   laterButtonText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '500',
     color: '#6B7280',
+  },
+  linkSeparator: {
+    fontSize: 13,
+    color: '#D1D5DB',
+  },
+  restoreButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  restoreButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#9CA3AF',
   },
 });
